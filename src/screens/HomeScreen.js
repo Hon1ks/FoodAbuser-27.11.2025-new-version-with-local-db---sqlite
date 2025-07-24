@@ -40,7 +40,8 @@ export default function HomeScreen() {
             <Text style={styles.hello}>Привет, User!</Text>
             <Text style={styles.date}>{new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</Text>
           </View>
-          <Avatar.Image size={48} source={require('../../assets/avatar.png')} style={styles.avatar} />
+          {/* Используем иконку вместо изображения */}
+          <Avatar.Icon size={48} icon="account" style={styles.avatar} />
         </View>
         {/* Дневная сводка */}
         <Card style={styles.summaryCard} elevation={4}>
@@ -104,6 +105,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 18,
+    marginTop: 32,
   },
   hello: {
     fontSize: 24,
