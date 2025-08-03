@@ -33,32 +33,24 @@ const kcalDataMap = {
   '6m': { labels: ['Март', 'Апр', 'Май', 'Июнь', 'Июль'], datasets: [{ data: [2500, 2300, 2200, 2000, 1800] }] },
   year: { labels: ['2024', '2025'], datasets: [{ data: [2600, 1800] }] },
 };
-const waterDataMap = {
-  day: { labels: ['08:00', '12:00', '16:00', '20:00'], datasets: [{ data: [0.5, 1, 1.5, 2] }] },
-  week: { labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], datasets: [{ data: [2, 2, 1.8, 2, 2.2, 2, 1.9] }] },
-  month: { labels: ['1', '5', '10', '15', '20', '25', '30'], datasets: [{ data: [2, 2.1, 2, 2.2, 2, 2.3, 2.1] }] },
-  '3m': { labels: ['Май', 'Июнь', 'Июль'], datasets: [{ data: [2.2, 2.1, 2] }] },
-  '6m': { labels: ['Март', 'Апр', 'Май', 'Июнь', 'Июль'], datasets: [{ data: [2.3, 2.2, 2.1, 2, 2] }] },
-  year: { labels: ['2024', '2025'], datasets: [{ data: [2.2, 2] }] },
-};
+
 
 const widgetList = [
   { key: 'weight', label: 'Динамика веса', icon: 'scale-bathroom' },
   { key: 'kcal', label: 'Динамика калорий', icon: 'fire' },
-  { key: 'water', label: 'Динамика потребления воды', icon: 'cup-water' },
 ];
 
 export default function AnalyticsScreen() {
   const theme = useTheme();
   const [weightPeriod, setWeightPeriod] = React.useState('week');
   const [kcalPeriod, setKcalPeriod] = React.useState('week');
-  const [waterPeriod, setWaterPeriod] = React.useState('week');
+
   const [activeWidgets, setActiveWidgets] = React.useState(['weight', 'kcal']);
   const [addWidgetVisible, setAddWidgetVisible] = React.useState(false);
 
   const weightData = weightDataMap[weightPeriod];
   const kcalData = kcalDataMap[kcalPeriod];
-  const waterData = waterDataMap[waterPeriod];
+
 
   const handleRemoveWidget = key => setActiveWidgets(w => w.filter(k => k !== key));
   const handleAddWidget = key => setActiveWidgets(w => w.includes(key) ? w : [...w, key]);
@@ -142,39 +134,7 @@ export default function AnalyticsScreen() {
             </Card.Content>
           </Card>
         )}
-        {activeWidgets.includes('water') && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <View style={styles.cardHeader}>
-                <Text style={styles.chartTitle}>Динамика потребления воды</Text>
-                <IconButton icon="close" size={20} onPress={() => handleRemoveWidget('water')} />
-              </View>
-              <View style={styles.periodRow}>
-                {periods.map(p => (
-                  <Chip
-                    key={p.value}
-                    selected={waterPeriod === p.value}
-                    onPress={() => setWaterPeriod(p.value)}
-                    style={styles.chip}
-                    textStyle={styles.chipText}
-                  >
-                    {p.label}
-                  </Chip>
-                ))}
-              </View>
-              <LineChart
-                data={waterData}
-                width={chartWidth}
-                height={200}
-                chartConfig={weightChartConfig}
-                style={{ borderRadius: 12, alignSelf: 'center' }}
-                fromZero
-                yLabelsOffset={8}
-                formatYLabel={y => Number(y).toFixed(1)}
-              />
-            </Card.Content>
-          </Card>
-        )}
+
         <Card style={styles.card}>
           <Card.Content>
             <Text style={styles.chartTitle}>Рекомендации</Text>

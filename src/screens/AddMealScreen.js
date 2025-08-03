@@ -45,6 +45,19 @@ export default function AddMealScreen() {
   const [initialWeightInput, setInitialWeightInput] = React.useState('');
   const [weightSettingsType, setWeightSettingsType] = React.useState(''); // 'target' или 'initial'
   const [weightSettingsMenuVisible, setWeightSettingsMenuVisible] = React.useState(false);
+  const [weightDate, setWeightDate] = React.useState(new Date());
+  const [showWeightDatePicker, setShowWeightDatePicker] = React.useState(false);
+  const [showWeightHistory, setShowWeightHistory] = React.useState(false);
+
+  // Функция для форматирования даты на русском языке
+  const formatDate = (date) => {
+    const months = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+    ];
+    const d = new Date(date);
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  };
 
   const addWater = (amount) => {
     setWaterAmount((prev) => Math.min(prev + amount, waterGoal));
@@ -71,47 +84,47 @@ export default function AddMealScreen() {
   };
 
   const addWeightRecord = (weight) => {
+    const newWeight = parseFloat(weight);
+    if (isNaN(newWeight)) return;
+
     const newRecord = {
-      weight: parseFloat(weight),
-      date: new Date().toISOString(),
+      weight: newWeight,
+      date: weightDate.toISOString(),
     };
-    setWeightHistory(prev => [...prev, newRecord]);
-    setCurrentWeight(parseFloat(weight));
+
+    // Если это первая запись, используем её как начальный вес
+    if (weightHistory.length === 0) {
+      setInitialWeight(newWeight);
+    }
+
+    // Добавляем запись и сортируем историю по дате
+    setWeightHistory(prev => [...prev, newRecord].sort((a, b) => 
+      new Date(b.date) - new Date(a.date)
+    ));
+    setCurrentWeight(newWeight);
     setWeightInput('');
+    setWeightDate(new Date()); // Сбрасываем дату на текущую для следующей записи
     setWeightModal(false);
   };
 
   const getWeightProgress = () => {
-    const startWeight = weightHistory.length > 0 ? weightHistory[0].weight : initialWeight;
+    // Если нет начального или целевого веса, прогресс невозможно рассчитать
+    if (!initialWeight || !targetWeight) return 0;
+
+    // Вычисляем общее необходимое изменение
+    const totalChange = Math.abs(initialWeight - targetWeight);
     
-    if (startWeight === targetWeight) return 1; // Цель уже достигнута
+    // Защита от деления на ноль
+    if (totalChange === 0) return 1; // Если начальный вес равен целевому, значит цель достигнута
     
-    // Если цель - похудение (начальный > целевой)
-    if (startWeight > targetWeight) {
-      const totalChange = startWeight - targetWeight; // Общее количество кг для похудения
-      const currentChange = startWeight - currentWeight; // Уже сброшено кг
-      
-      if (totalChange === 0) return 0;
-      
-      const progress = Math.max(0, Math.min(currentChange / totalChange, 1));
-      // Пример: начальный 75, цель 65, текущий 68
-      // totalChange = 75 - 65 = 10 кг, currentChange = 75 - 68 = 7 кг
-      // progress = 7/10 = 0.7 (70%)
-      return progress;
-    }
-    // Если цель - набор веса (начальный < целевой)
-    else {
-      const totalChange = targetWeight - startWeight; // Общее количество кг для набора
-      const currentChange = currentWeight - startWeight; // Уже набрано кг
-      
-      if (totalChange === 0) return 0;
-      
-      const progress = Math.max(0, Math.min(currentChange / totalChange, 1));
-      // Пример: начальный 60, цель 70, текущий 65
-      // totalChange = 70 - 60 = 10 кг, currentChange = 65 - 60 = 5 кг
-      // progress = 5/10 = 0.5 (50%)
-      return progress;
-    }
+    // Вычисляем текущее изменение от начального веса
+    const currentChange = Math.abs(initialWeight - currentWeight);
+    
+    // Вычисляем прогресс
+    const progress = currentChange / totalChange;
+    
+    // Ограничиваем значение от 0 до 1
+    return Math.min(Math.max(progress, 0), 1);
   };
 
   const openWeightSettings = (type) => {
@@ -129,7 +142,14 @@ export default function AddMealScreen() {
       setTargetWeight(Number(targetWeightInput));
       setTargetWeightInput('');
     } else if (weightSettingsType === 'initial' && initialWeightInput && !isNaN(Number(initialWeightInput))) {
-      setInitialWeight(Number(initialWeightInput));
+      const newInitialWeight = Number(initialWeightInput);
+      setInitialWeight(newInitialWeight);
+      
+      // При изменении начального веса, если нет истории, устанавливаем его как текущий
+      if (weightHistory.length === 0) {
+        setCurrentWeight(newInitialWeight);
+      }
+      
       setInitialWeightInput('');
     }
     setWeightSettingsModal(false);
@@ -288,7 +308,7 @@ export default function AddMealScreen() {
             <View style={styles.progressContainer}>
               <View style={styles.progressHeader}>
                 <Text style={styles.progressText}>
-                  {waterAmount} / {waterGoal} мл
+                  {(waterAmount/1000).toFixed(1).replace('.', ',')} / {(waterGoal/1000).toFixed(1).replace('.', ',')} л
                 </Text>
                 <Text style={styles.progressPercent}>
                   {Math.round((waterAmount / waterGoal) * 100)}%
@@ -377,15 +397,15 @@ export default function AddMealScreen() {
             <View style={styles.weightInfo}>
               <View style={styles.weightItem}>
                 <Text style={styles.weightLabel}>Начальный</Text>
-                <Text style={styles.weightValue}>{initialWeight} кг</Text>
+                                        <Text style={styles.weightValue}>{initialWeight.toFixed(1).replace('.', ',')} кг</Text>
               </View>
               <View style={styles.weightItem}>
                 <Text style={styles.weightLabel}>Текущий</Text>
-                <Text style={styles.weightValue}>{currentWeight} кг</Text>
+                                        <Text style={styles.weightValue}>{currentWeight.toFixed(1).replace('.', ',')} кг</Text>
               </View>
               <View style={styles.weightItem}>
                 <Text style={styles.weightLabel}>Цель</Text>
-                <Text style={styles.weightValue}>{targetWeight} кг</Text>
+                                        <Text style={styles.weightValue}>{targetWeight.toFixed(1).replace('.', ',')} кг</Text>
               </View>
             </View>
 
@@ -405,14 +425,24 @@ export default function AddMealScreen() {
               />
             </View>
 
-            <Button
-              mode="contained"
-              icon="plus"
-              onPress={() => setWeightModal(true)}
-              style={[styles.weightButton, { backgroundColor: '#10b981' }]}
-            >
-              Записать новый вес
-            </Button>
+            <View style={styles.weightButtons}>
+              <Button
+                mode="contained"
+                icon="plus"
+                onPress={() => setWeightModal(true)}
+                style={[styles.weightButton, { backgroundColor: '#10b981', marginBottom: 8 }]}
+              >
+                Записать новый вес
+              </Button>
+              <Button
+                mode="outlined"
+                icon="history"
+                onPress={() => setShowWeightHistory(true)}
+                style={styles.weightButton}
+              >
+                Показать все
+              </Button>
+            </View>
           </Surface>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -424,11 +454,19 @@ export default function AddMealScreen() {
           <TextInput
             label="Цель (литры)"
             value={waterGoalInput}
-            onChangeText={setWaterGoalInput}
-            keyboardType="numeric"
+            onChangeText={(text) => {
+              // Заменяем запятую на точку
+              const formattedText = text.replace(',', '.');
+              // Проверяем, что введено корректное число с не более чем одной точкой
+              // и не более одним знаком после точки
+              if (formattedText === '' || /^\d*\.?\d{0,1}$/.test(formattedText)) {
+                setWaterGoalInput(formattedText);
+              }
+            }}
+            keyboardType="decimal-pad"
             style={{ marginBottom: 16, backgroundColor: '#f6f6fa' }}
             left={<TextInput.Icon icon="target" />}
-            placeholder="Например: 2.5"
+            placeholder="Например: 3,5"
           />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Button mode="outlined" onPress={() => setWaterGoalModal(false)} style={{ flex: 1, marginRight: 8 }}>
@@ -457,7 +495,8 @@ export default function AddMealScreen() {
             left={<TextInput.Icon icon="cup-water" />}
             placeholder="Например: 300"
           />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
             <Button mode="outlined" onPress={() => setManualWaterModal(false)} style={{ flex: 1, marginRight: 8 }}>
               Отмена
             </Button>
@@ -476,14 +515,92 @@ export default function AddMealScreen() {
         <Modal visible={weightModal} onDismiss={() => setWeightModal(false)} contentContainerStyle={{ backgroundColor: '#fff', padding: 24, borderRadius: 18, marginHorizontal: 24 }}>
           <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: '#10b981', textAlign: 'center' }}>Записать вес</Text>
           <TextInput
-            label="Вес (кг)"
-            value={weightInput}
-            onChangeText={setWeightInput}
-            keyboardType="numeric"
-            style={{ marginBottom: 16, backgroundColor: '#f6f6fa' }}
-            left={<TextInput.Icon icon="weight-kilogram" />}
-            placeholder="Например: 68.5"
+                                label="Вес (кг)"
+                    value={weightInput}
+                    onChangeText={(text) => {
+                      // Заменяем запятую на точку
+                      const formattedText = text.replace(',', '.');
+                      // Проверяем, что введено корректное число с не более чем одной точкой
+                      // и не более одним знаком после точки
+                      if (formattedText === '' || /^\d*\.?\d{0,1}$/.test(formattedText)) {
+                        setWeightInput(formattedText);
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                    style={{ marginBottom: 16, backgroundColor: '#f6f6fa' }}
+                    left={<TextInput.Icon icon="weight-kilogram" />}
+                    placeholder="Например: 90,2"
           />
+          <View style={styles.datePickerContainer}>
+            <Text style={styles.sectionLabel}>Дата</Text>
+            <Button
+              mode="outlined"
+              icon="calendar"
+              onPress={() => setShowWeightDatePicker(true)}
+              style={styles.dateButton}
+              labelStyle={styles.dateButtonText}
+            >
+              {formatDate(weightDate)}
+            </Button>
+          </View>
+          {Platform.OS === 'ios' ? (
+            <Portal>
+              <Modal
+                visible={showWeightDatePicker}
+                onDismiss={() => setShowWeightDatePicker(false)}
+                contentContainerStyle={{
+                  backgroundColor: '#fff',
+                  padding: 20,
+                  marginHorizontal: 20,
+                  marginVertical: '30%',
+                  borderRadius: 18
+                }}
+              >
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, textAlign: 'center', color: '#10b981' }}>
+                    Выберите дату
+                  </Text>
+                  <DateTimePicker
+                    value={weightDate}
+                    mode="date"
+                    display="spinner"
+                    onChange={(event, selectedDate) => {
+                      if (selectedDate) {
+                        setWeightDate(selectedDate);
+                      }
+                    }}
+                    maximumDate={new Date()}
+                    locale="ru-RU"
+                    textColor="#000000"
+                    style={{ width: '100%', height: 200 }}
+                  />
+                  <Button
+                    mode="contained"
+                    onPress={() => setShowWeightDatePicker(false)}
+                    style={{ marginTop: 16, backgroundColor: '#10b981', width: '100%' }}
+                  >
+                    Готово
+                  </Button>
+                </View>
+              </Modal>
+            </Portal>
+          ) : (
+            showWeightDatePicker && (
+              <DateTimePicker
+                value={weightDate}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowWeightDatePicker(false);
+                  if (selectedDate) {
+                    setWeightDate(selectedDate);
+                  }
+                }}
+                maximumDate={new Date()}
+                locale="ru-RU"
+              />
+            )
+          )}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Button mode="outlined" onPress={() => setWeightModal(false)} style={{ flex: 1, marginRight: 8 }}>
               Отмена
@@ -505,13 +622,25 @@ export default function AddMealScreen() {
             {weightSettingsType === 'target' ? 'Установить цель' : 'Установить начальный вес'}
           </Text>
           <TextInput
-            label={weightSettingsType === 'target' ? 'Целевой вес (кг)' : 'Начальный вес (кг)'}
-            value={weightSettingsType === 'target' ? targetWeightInput : initialWeightInput}
-            onChangeText={weightSettingsType === 'target' ? setTargetWeightInput : setInitialWeightInput}
-            keyboardType="numeric"
-            style={{ marginBottom: 16, backgroundColor: '#f6f6fa' }}
-                                left={<TextInput.Icon icon={weightSettingsType === 'target' ? 'target' : 'flag'} />}
-            placeholder="Например: 65"
+                                label={weightSettingsType === 'target' ? 'Целевой вес (кг)' : 'Начальный вес (кг)'}
+                    value={weightSettingsType === 'target' ? targetWeightInput : initialWeightInput}
+                    onChangeText={(text) => {
+                      // Заменяем запятую на точку
+                      const formattedText = text.replace(',', '.');
+                      // Проверяем, что введено корректное число с не более чем одной точкой
+                      // и не более одним знаком после точки
+                      if (formattedText === '' || /^\d*\.?\d{0,1}$/.test(formattedText)) {
+                        if (weightSettingsType === 'target') {
+                          setTargetWeightInput(formattedText);
+                        } else {
+                          setInitialWeightInput(formattedText);
+                        }
+                      }
+                    }}
+                    keyboardType="decimal-pad"
+                    style={{ marginBottom: 16, backgroundColor: '#f6f6fa' }}
+                    left={<TextInput.Icon icon={weightSettingsType === 'target' ? 'target' : 'flag'} />}
+                    placeholder="Например: 65,5"
           />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
             <Button mode="outlined" onPress={() => setWeightSettingsModal(false)} style={{ flex: 1, marginRight: 8 }}>
@@ -527,6 +656,59 @@ export default function AddMealScreen() {
             </Button>
           </View>
         </Modal>
+
+        {/* Модальное окно с историей веса */}
+        <Modal 
+          visible={showWeightHistory} 
+          onDismiss={() => setShowWeightHistory(false)} 
+          contentContainerStyle={{ 
+            backgroundColor: '#fff', 
+            padding: 24, 
+            borderRadius: 18, 
+            marginHorizontal: 24,
+            maxHeight: '80%' 
+          }}
+        >
+          <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: '#10b981', textAlign: 'center' }}>
+            История изменения веса
+          </Text>
+          <ScrollView style={{ maxHeight: '90%' }}>
+            {weightHistory.map((record, index) => (
+              <View 
+                key={index} 
+                style={{ 
+                  flexDirection: 'row', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  paddingVertical: 12,
+                  borderBottomWidth: index !== weightHistory.length - 1 ? 1 : 0,
+                  borderBottomColor: '#e5e7eb'
+                }}
+              >
+                <Text style={{ fontSize: 18, color: '#10b981', fontWeight: 'bold' }}>
+                  {record.weight.toFixed(1).replace('.', ',')} кг
+                </Text>
+                <Text style={{ fontSize: 16, color: '#6b7280' }}>
+                  {formatDate(record.date)}
+                </Text>
+              </View>
+            ))}
+            {weightHistory.length === 0 && (
+              <Text style={{ textAlign: 'center', color: '#6b7280', fontSize: 16 }}>
+                История пуста
+              </Text>
+            )}
+          </ScrollView>
+          <Button 
+            mode="outlined" 
+            onPress={() => setShowWeightHistory(false)}
+            style={{ marginTop: 16 }}
+          >
+            Закрыть
+          </Button>
+        </Modal>
+
+
       </Portal>
     </View>
   );
@@ -751,5 +933,23 @@ const styles = StyleSheet.create({
   weightButton: {
     borderRadius: 14,
     width: '100%',
+  },
+  weightButtons: {
+    width: '100%',
+  },
+  datePickerContainer: {
+    marginBottom: 16,
+  },
+  dateButton: {
+    width: '100%',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+    height: 48,
+    borderRadius: 12,
+  },
+  dateButtonText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
   },
 }); 
