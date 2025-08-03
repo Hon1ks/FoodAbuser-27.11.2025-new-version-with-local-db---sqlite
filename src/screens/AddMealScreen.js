@@ -83,19 +83,33 @@ export default function AddMealScreen() {
 
   const getWeightProgress = () => {
     const startWeight = weightHistory.length > 0 ? weightHistory[0].weight : initialWeight;
-    const totalChange = Math.abs(startWeight - targetWeight);
-    const currentChange = Math.abs(startWeight - currentWeight);
     
-    if (totalChange === 0) return 0;
+    if (startWeight === targetWeight) return 1; // Цель уже достигнута
     
     // Если цель - похудение (начальный > целевой)
     if (startWeight > targetWeight) {
-      const progress = Math.min(currentChange / totalChange, 1);
+      const totalChange = startWeight - targetWeight; // Общее количество кг для похудения
+      const currentChange = startWeight - currentWeight; // Уже сброшено кг
+      
+      if (totalChange === 0) return 0;
+      
+      const progress = Math.max(0, Math.min(currentChange / totalChange, 1));
+      // Пример: начальный 75, цель 65, текущий 68
+      // totalChange = 75 - 65 = 10 кг, currentChange = 75 - 68 = 7 кг
+      // progress = 7/10 = 0.7 (70%)
       return progress;
     }
     // Если цель - набор веса (начальный < целевой)
     else {
-      const progress = Math.min(currentChange / totalChange, 1);
+      const totalChange = targetWeight - startWeight; // Общее количество кг для набора
+      const currentChange = currentWeight - startWeight; // Уже набрано кг
+      
+      if (totalChange === 0) return 0;
+      
+      const progress = Math.max(0, Math.min(currentChange / totalChange, 1));
+      // Пример: начальный 60, цель 70, текущий 65
+      // totalChange = 70 - 60 = 10 кг, currentChange = 65 - 60 = 5 кг
+      // progress = 5/10 = 0.5 (50%)
       return progress;
     }
   };
@@ -349,14 +363,14 @@ export default function AddMealScreen() {
                   title="Установить цель по весу"
                   leadingIcon="target"
                 />
-                <Menu.Item
-                  onPress={() => {
-                    setWeightSettingsMenuVisible(false);
-                    openWeightSettings('initial');
-                  }}
-                  title="Установить начальный вес"
-                  leadingIcon="flag-start"
-                />
+                                        <Menu.Item
+                          onPress={() => {
+                            setWeightSettingsMenuVisible(false);
+                            openWeightSettings('initial');
+                          }}
+                          title="Установить начальный вес"
+                          leadingIcon="flag"
+                        />
               </Menu>
             </View>
             
@@ -496,7 +510,7 @@ export default function AddMealScreen() {
             onChangeText={weightSettingsType === 'target' ? setTargetWeightInput : setInitialWeightInput}
             keyboardType="numeric"
             style={{ marginBottom: 16, backgroundColor: '#f6f6fa' }}
-            left={<TextInput.Icon icon={weightSettingsType === 'target' ? 'target' : 'flag-start'} />}
+                                left={<TextInput.Icon icon={weightSettingsType === 'target' ? 'target' : 'flag'} />}
             placeholder="Например: 65"
           />
           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
