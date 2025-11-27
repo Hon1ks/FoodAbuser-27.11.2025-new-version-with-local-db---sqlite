@@ -1,9 +1,11 @@
 import * as React from 'react';
 import { View, StyleSheet, ScrollView, Dimensions } from 'react-native';
-import { Text, Card, useTheme, Chip, IconButton, Portal, Modal, Button } from 'react-native-paper';
+import { Text, Card, useTheme, Chip, IconButton, Portal, Modal, Button, ProgressBar } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LineChart } from 'react-native-chart-kit';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMeals } from '../context/MealContext';
+import { useWeight } from '../context/WeightContext';
 
 const screenWidth = Dimensions.get('window').width - 36;
 const chartWidth = screenWidth - 32;
@@ -17,27 +19,13 @@ const periods = [
   { label: 'Год', value: 'year' },
 ];
 
-const weightDataMap = {
-  day: { labels: ['08:00', '12:00', '16:00', '20:00'], datasets: [{ data: [80, 80.1, 80, 79.9] }] },
-  week: { labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], datasets: [{ data: [80.2, 80.1, 80, 80, 79.9, 79.8, 79.7] }] },
-  month: { labels: ['1', '5', '10', '15', '20', '25', '30'], datasets: [{ data: [81, 80.7, 80.5, 80.2, 80, 79.8, 79.7] }] },
-  '3m': { labels: ['Май', 'Июнь', 'Июль'], datasets: [{ data: [83, 81, 79.7] }] },
-  '6m': { labels: ['Март', 'Апр', 'Май', 'Июнь', 'Июль'], datasets: [{ data: [85, 84, 83, 81, 79.7] }] },
-  year: { labels: ['2024', '2025'], datasets: [{ data: [90, 79.7] }] },
-};
-const kcalDataMap = {
-  day: { labels: ['08:00', '12:00', '16:00', '20:00'], datasets: [{ data: [400, 600, 800, 1200] }] },
-  week: { labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], datasets: [{ data: [1800, 2000, 1750, 2100, 1900, 2200, 1700] }] },
-  month: { labels: ['1', '5', '10', '15', '20', '25', '30'], datasets: [{ data: [2100, 2000, 1950, 1900, 1850, 1800, 1750] }] },
-  '3m': { labels: ['Май', 'Июнь', 'Июль'], datasets: [{ data: [2200, 2000, 1800] }] },
-  '6m': { labels: ['Март', 'Апр', 'Май', 'Июнь', 'Июль'], datasets: [{ data: [2500, 2300, 2200, 2000, 1800] }] },
-  year: { labels: ['2024', '2025'], datasets: [{ data: [2600, 1800] }] },
-};
+// Удаляем статические данные - теперь используем данные из контекстов
 
 
 const widgetList = [
   { key: 'weight', label: 'Динамика веса', icon: 'scale-bathroom' },
   { key: 'kcal', label: 'Динамика калорий', icon: 'fire' },
+  { key: 'kbju', label: 'Статистика КБЖУ', icon: 'chart-pie' },
 ];
 
 export default function AnalyticsScreen() {
@@ -45,11 +33,36 @@ export default function AnalyticsScreen() {
   const [weightPeriod, setWeightPeriod] = React.useState('week');
   const [kcalPeriod, setKcalPeriod] = React.useState('week');
 
-  const [activeWidgets, setActiveWidgets] = React.useState(['weight', 'kcal']);
+  const [activeWidgets, setActiveWidgets] = React.useState(['weight', 'kcal', 'kbju']);
   const [addWidgetVisible, setAddWidgetVisible] = React.useState(false);
 
-  const weightData = weightDataMap[weightPeriod];
-  const kcalData = kcalDataMap[kcalPeriod];
+  // Используем контексты для получения данных
+  const { 
+    stats: mealStats, 
+    periodStats, 
+    getChartData: getMealChartData,
+    getRecommendations: getMealRecommendations,
+    loading: mealsLoading 
+  } = useMeals();
+  
+  const { 
+    stats: weightStats, 
+    currentWeight, 
+    targetWeight, 
+    initialWeight,
+    getChartData: getWeightChartData,
+    getRecommendations: getWeightRecommendations,
+    loading: weightLoading 
+  } = useWeight();
+
+  // Получаем данные для графиков
+  const weightData = getWeightChartData(weightPeriod);
+  const kcalData = getMealChartData(kcalPeriod, 'kcal');
+  
+  // Получаем рекомендации
+  const mealRecommendations = getMealRecommendations();
+  const weightRecommendations = getWeightRecommendations();
+  const allRecommendations = [...mealRecommendations, ...weightRecommendations];
 
 
   const handleRemoveWidget = key => setActiveWidgets(w => w.filter(k => k !== key));
@@ -75,6 +88,29 @@ export default function AnalyticsScreen() {
                 <Text style={styles.chartTitle}>Динамика веса</Text>
                 <IconButton icon="close" size={20} onPress={() => handleRemoveWidget('weight')} />
               </View>
+              
+              {/* Статистика веса */}
+              <View style={styles.weightStatsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Текущий</Text>
+                  <Text style={styles.statValue}>{currentWeight.toFixed(1)} кг</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Цель</Text>
+                  <Text style={styles.statValue}>{targetWeight.toFixed(1)} кг</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Прогресс</Text>
+                  <Text style={styles.statValue}>{weightStats.progressPercentage.toFixed(0)}%</Text>
+                </View>
+              </View>
+              
+              <ProgressBar 
+                progress={weightStats.progressPercentage / 100} 
+                color="#43cea2" 
+                style={styles.progressBar}
+              />
+              
               <View style={styles.periodRow}>
                 {periods.map(p => (
                   <Chip
@@ -88,16 +124,23 @@ export default function AnalyticsScreen() {
                   </Chip>
                 ))}
               </View>
-              <LineChart
-                data={weightData}
-                width={chartWidth}
-                height={200}
-                chartConfig={weightChartConfig}
-                style={{ borderRadius: 12, alignSelf: 'center' }}
-                fromZero
-                yLabelsOffset={8}
-                formatYLabel={y => Number(y).toFixed(1)}
-              />
+              
+              {weightData.labels.length > 0 ? (
+                <LineChart
+                  data={weightData}
+                  width={chartWidth}
+                  height={200}
+                  chartConfig={weightChartConfig}
+                  style={{ borderRadius: 12, alignSelf: 'center' }}
+                  fromZero
+                  yLabelsOffset={8}
+                  formatYLabel={y => Number(y).toFixed(1)}
+                />
+              ) : (
+                <View style={styles.noDataContainer}>
+                  <Text style={styles.noDataText}>Нет данных для отображения</Text>
+                </View>
+              )}
             </Card.Content>
           </Card>
         )}
@@ -108,6 +151,23 @@ export default function AnalyticsScreen() {
                 <Text style={styles.chartTitle}>Динамика калорий</Text>
                 <IconButton icon="close" size={20} onPress={() => handleRemoveWidget('kcal')} />
               </View>
+              
+              {/* Статистика калорий */}
+              <View style={styles.calorieStatsRow}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Сегодня</Text>
+                  <Text style={styles.statValue}>{periodStats.day.calories} ккал</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Неделя</Text>
+                  <Text style={styles.statValue}>{Math.round(periodStats.week.calories / 7)} ккал/день</Text>
+                </View>
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Среднее</Text>
+                  <Text style={styles.statValue}>{Math.round(mealStats.averageCalories)} ккал</Text>
+                </View>
+              </View>
+              
               <View style={styles.periodRow}>
                 {periods.map(p => (
                   <Chip
@@ -121,41 +181,112 @@ export default function AnalyticsScreen() {
                   </Chip>
                 ))}
               </View>
-              <LineChart
-                data={kcalData}
-                width={chartWidth}
-                height={200}
-                chartConfig={weightChartConfig}
-                style={{ borderRadius: 12, alignSelf: 'center' }}
-                fromZero
-                yLabelsOffset={8}
-                formatYLabel={y => Math.round(Number(y)).toString()}
-              />
+              
+              {kcalData.labels.length > 0 ? (
+                <LineChart
+                  data={kcalData}
+                  width={chartWidth}
+                  height={200}
+                  chartConfig={weightChartConfig}
+                  style={{ borderRadius: 12, alignSelf: 'center' }}
+                  fromZero
+                  yLabelsOffset={8}
+                  formatYLabel={y => Math.round(Number(y)).toString()}
+                />
+              ) : (
+                <View style={styles.noDataContainer}>
+                  <Text style={styles.noDataText}>Нет данных для отображения</Text>
+                </View>
+              )}
             </Card.Content>
           </Card>
         )}
 
+        {/* Новый виджет - Статистика КБЖУ */}
+        {activeWidgets.includes('kbju') && (
+          <Card style={styles.card}>
+            <Card.Content>
+              <View style={styles.cardHeader}>
+                <Text style={styles.chartTitle}>Статистика КБЖУ</Text>
+                <IconButton icon="close" size={20} onPress={() => handleRemoveWidget('kbju')} />
+              </View>
+              
+              {/* Общая статистика КБЖУ */}
+              <View style={styles.kbjuStatsContainer}>
+                <View style={styles.kbjuRow}>
+                  <View style={styles.kbjuItem}>
+                    <Text style={styles.kbjuLabel}>Калории</Text>
+                    <Text style={[styles.kbjuValue, { color: '#ff6b6b' }]}>{Math.round(mealStats.totalCalories)}</Text>
+                    <Text style={styles.kbjuUnit}>ккал</Text>
+                  </View>
+                  <View style={styles.kbjuItem}>
+                    <Text style={styles.kbjuLabel}>Белки</Text>
+                    <Text style={[styles.kbjuValue, { color: '#4ecdc4' }]}>{Math.round(mealStats.totalProtein)}</Text>
+                    <Text style={styles.kbjuUnit}>г</Text>
+                  </View>
+                </View>
+                <View style={styles.kbjuRow}>
+                  <View style={styles.kbjuItem}>
+                    <Text style={styles.kbjuLabel}>Жиры</Text>
+                    <Text style={[styles.kbjuValue, { color: '#ffd93d' }]}>{Math.round(mealStats.totalFat)}</Text>
+                    <Text style={styles.kbjuUnit}>г</Text>
+                  </View>
+                  <View style={styles.kbjuItem}>
+                    <Text style={styles.kbjuLabel}>Углеводы</Text>
+                    <Text style={[styles.kbjuValue, { color: '#6c5ce7' }]}>{Math.round(mealStats.totalCarbs)}</Text>
+                    <Text style={styles.kbjuUnit}>г</Text>
+                  </View>
+                </View>
+              </View>
+              
+              {/* Процентное соотношение КБЖУ */}
+              <View style={styles.kbjuPercentageContainer}>
+                <Text style={styles.kbjuPercentageTitle}>Соотношение макронутриентов</Text>
+                <View style={styles.kbjuPercentageRow}>
+                  <View style={styles.kbjuPercentageItem}>
+                    <View style={[styles.kbjuPercentageBar, { backgroundColor: '#4ecdc4', width: '25%' }]} />
+                    <Text style={styles.kbjuPercentageText}>Белки 25%</Text>
+                  </View>
+                  <View style={styles.kbjuPercentageItem}>
+                    <View style={[styles.kbjuPercentageBar, { backgroundColor: '#ffd93d', width: '25%' }]} />
+                    <Text style={styles.kbjuPercentageText}>Жиры 25%</Text>
+                  </View>
+                  <View style={styles.kbjuPercentageItem}>
+                    <View style={[styles.kbjuPercentageBar, { backgroundColor: '#6c5ce7', width: '50%' }]} />
+                    <Text style={styles.kbjuPercentageText}>Углеводы 50%</Text>
+                  </View>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {/* Обновленные рекомендации */}
         <Card style={styles.card}>
           <Card.Content>
-            <Text style={styles.chartTitle}>Рекомендации</Text>
-            <View style={styles.recommendRow}>
-              <MaterialCommunityIcons name="run-fast" size={28} color="#43cea2" style={{marginRight: 8}} />
-              <Text style={styles.recommendText}>
-                Следите за динамикой веса и корректируйте рацион при необходимости.
-              </Text>
-            </View>
-            <View style={styles.recommendRow}>
-              <MaterialCommunityIcons name="food-apple" size={28} color="#6C63FF" style={{marginRight: 8}} />
-              <Text style={styles.recommendText}>
-                Соблюдайте баланс КБЖУ для достижения целей по весу.
-              </Text>
-            </View>
-            <View style={styles.recommendRow}>
-              <MaterialCommunityIcons name="cup-water" size={28} color="#43cea2" style={{marginRight: 8}} />
-              <Text style={styles.recommendText}>
-                Пейте больше воды — это важно для обмена веществ и контроля аппетита.
-              </Text>
-            </View>
+            <Text style={styles.chartTitle}>Персональные рекомендации</Text>
+            {allRecommendations.length > 0 ? (
+              allRecommendations.map((recommendation, index) => (
+                <View key={index} style={styles.recommendRow}>
+                  <MaterialCommunityIcons 
+                    name={recommendation.icon} 
+                    size={28} 
+                    color={recommendation.color} 
+                    style={{marginRight: 8}} 
+                  />
+                  <Text style={styles.recommendText}>
+                    {recommendation.text}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <View style={styles.recommendRow}>
+                <MaterialCommunityIcons name="information" size={28} color="#6C63FF" style={{marginRight: 8}} />
+                <Text style={styles.recommendText}>
+                  Добавьте больше данных о питании для получения персональных рекомендаций.
+                </Text>
+              </View>
+            )}
           </Card.Content>
         </Card>
         <View style={{ height: 80 }} />
@@ -306,5 +437,115 @@ const styles = StyleSheet.create({
     flex: 1,
     flexWrap: 'wrap',
     marginTop: 2,
+  },
+  // Новые стили для статистики веса
+  weightStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#232634',
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 12,
+    backgroundColor: '#e5e7eb',
+  },
+  // Новые стили для статистики калорий
+  calorieStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  // Новые стили для КБЖУ
+  kbjuStatsContainer: {
+    marginBottom: 16,
+  },
+  kbjuRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+  },
+  kbjuItem: {
+    alignItems: 'center',
+    flex: 1,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    marginHorizontal: 4,
+  },
+  kbjuLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  kbjuValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  kbjuUnit: {
+    fontSize: 10,
+    color: '#6b7280',
+  },
+  kbjuPercentageContainer: {
+    marginTop: 8,
+  },
+  kbjuPercentageTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  kbjuPercentageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  kbjuPercentageItem: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  kbjuPercentageBar: {
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 4,
+  },
+  kbjuPercentageText: {
+    fontSize: 10,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  // Стили для отсутствия данных
+  noDataContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
   },
 }); 

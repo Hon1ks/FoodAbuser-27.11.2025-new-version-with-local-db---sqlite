@@ -3,6 +3,7 @@ import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Touchable
 import { Text, TextInput, Button, useTheme, Surface, HelperText, IconButton, Menu, Divider, Portal, Modal, ProgressBar, Chip } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useWeight } from '../context/WeightContext';
 
 const categories = [
   { label: 'Завтрак', value: 'breakfast', icon: 'food-croissant' },
@@ -35,11 +36,20 @@ export default function AddMealScreen() {
   const [manualWaterModal, setManualWaterModal] = React.useState(false);
   const [manualWaterInput, setManualWaterInput] = React.useState('');
   
-  // Для трекера веса:
-  const [currentWeight, setCurrentWeight] = React.useState(70); // текущий вес в кг
-  const [targetWeight, setTargetWeight] = React.useState(65); // целевой вес в кг
-  const [initialWeight, setInitialWeight] = React.useState(75); // начальный вес в кг
-  const [weightHistory, setWeightHistory] = React.useState([]);
+  // Используем WeightContext вместо локального состояния
+  const {
+    currentWeight,
+    targetWeight,
+    initialWeight,
+    weightRecords,
+    stats: weightStats,
+    addWeightRecord: addWeightRecordToContext,
+    deleteWeightRecord,
+    setTargetWeight: setTargetWeightInContext,
+    setInitialWeight: setInitialWeightInContext,
+  } = useWeight();
+  
+  // Локальное состояние для модальных окон
   const [weightSettingsModal, setWeightSettingsModal] = React.useState(false);
   const [targetWeightInput, setTargetWeightInput] = React.useState('');
   const [initialWeightInput, setInitialWeightInput] = React.useState('');
@@ -83,48 +93,25 @@ export default function AddMealScreen() {
     }
   };
 
-  const addWeightRecord = (weight) => {
+  const addWeightRecord = async (weight) => {
     const newWeight = parseFloat(weight);
     if (isNaN(newWeight)) return;
 
-    const newRecord = {
+    const weightData = {
       weight: newWeight,
-      date: weightDate.toISOString(),
+      record_date: weightDate.toISOString().split('T')[0], // формат YYYY-MM-DD
     };
 
-    // Если это первая запись, используем её как начальный вес
-    if (weightHistory.length === 0) {
-      setInitialWeight(newWeight);
-    }
-
-    // Добавляем запись и сортируем историю по дате
-    setWeightHistory(prev => [...prev, newRecord].sort((a, b) => 
-      new Date(b.date) - new Date(a.date)
-    ));
-    setCurrentWeight(newWeight);
+    // Используем функцию из контекста
+    await addWeightRecordToContext(weightData);
+    
     setWeightInput('');
     setWeightDate(new Date()); // Сбрасываем дату на текущую для следующей записи
     setWeightModal(false);
   };
 
   const getWeightProgress = () => {
-    // Если нет начального или целевого веса, прогресс невозможно рассчитать
-    if (!initialWeight || !targetWeight) return 0;
-
-    // Вычисляем общее необходимое изменение
-    const totalChange = Math.abs(initialWeight - targetWeight);
-    
-    // Защита от деления на ноль
-    if (totalChange === 0) return 1; // Если начальный вес равен целевому, значит цель достигнута
-    
-    // Вычисляем текущее изменение от начального веса
-    const currentChange = Math.abs(initialWeight - currentWeight);
-    
-    // Вычисляем прогресс
-    const progress = currentChange / totalChange;
-    
-    // Ограничиваем значение от 0 до 1
-    return Math.min(Math.max(progress, 0), 1);
+    return weightStats.progressPercentage / 100;
   };
 
   const openWeightSettings = (type) => {
@@ -139,17 +126,10 @@ export default function AddMealScreen() {
 
   const saveWeightSettings = () => {
     if (weightSettingsType === 'target' && targetWeightInput && !isNaN(Number(targetWeightInput))) {
-      setTargetWeight(Number(targetWeightInput));
+      setTargetWeightInContext(Number(targetWeightInput));
       setTargetWeightInput('');
     } else if (weightSettingsType === 'initial' && initialWeightInput && !isNaN(Number(initialWeightInput))) {
-      const newInitialWeight = Number(initialWeightInput);
-      setInitialWeight(newInitialWeight);
-      
-      // При изменении начального веса, если нет истории, устанавливаем его как текущий
-      if (weightHistory.length === 0) {
-        setCurrentWeight(newInitialWeight);
-      }
-      
+      setInitialWeightInContext(Number(initialWeightInput));
       setInitialWeightInput('');
     }
     setWeightSettingsModal(false);
@@ -673,27 +653,36 @@ export default function AddMealScreen() {
             История изменения веса
           </Text>
           <ScrollView style={{ maxHeight: '90%' }}>
-            {weightHistory.map((record, index) => (
+            {weightRecords.map((record, index) => (
               <View 
-                key={index} 
+                key={record.id} 
                 style={{ 
                   flexDirection: 'row', 
                   justifyContent: 'space-between', 
                   alignItems: 'center',
                   paddingVertical: 12,
-                  borderBottomWidth: index !== weightHistory.length - 1 ? 1 : 0,
+                  borderBottomWidth: index !== weightRecords.length - 1 ? 1 : 0,
                   borderBottomColor: '#e5e7eb'
                 }}
               >
-                <Text style={{ fontSize: 18, color: '#10b981', fontWeight: 'bold' }}>
-                  {record.weight.toFixed(1).replace('.', ',')} кг
-                </Text>
-                <Text style={{ fontSize: 16, color: '#6b7280' }}>
-                  {formatDate(record.date)}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, color: '#10b981', fontWeight: 'bold' }}>
+                    {record.weight.toFixed(1).replace('.', ',')} кг
+                  </Text>
+                  <Text style={{ fontSize: 16, color: '#6b7280' }}>
+                    {formatDate(record.record_date)}
+                  </Text>
+                </View>
+                <IconButton
+                  icon="delete"
+                  size={20}
+                  iconColor="#ff6b6b"
+                  onPress={() => deleteWeightRecord(record.id)}
+                  style={{ marginLeft: 8 }}
+                />
               </View>
             ))}
-            {weightHistory.length === 0 && (
+            {weightRecords.length === 0 && (
               <Text style={{ textAlign: 'center', color: '#6b7280', fontSize: 16 }}>
                 История пуста
               </Text>
