@@ -85,7 +85,7 @@ export default function WelcomeScreen() {
               style={[styles.button, {backgroundColor: '#43cea2'}]}
               labelStyle={{fontWeight: 'bold', fontSize: 18, color: '#fff'}}
               contentStyle={{height: 52}}
-              onPress={() => navigation.navigate('Login')}
+              onPress={() => navigation.navigate('MainTabs')}
             >
               {translations[lang].login}
             </Button>
@@ -94,7 +94,7 @@ export default function WelcomeScreen() {
               style={[styles.button, {borderColor: '#6C63FF'}]}
               labelStyle={{fontWeight: 'bold', fontSize: 18, color: '#6C63FF'}}
               contentStyle={{height: 52}}
-              onPress={() => navigation.navigate('Register')}
+              onPress={() => navigation.navigate('MainTabs')}
             >
               {translations[lang].register}
             </Button>

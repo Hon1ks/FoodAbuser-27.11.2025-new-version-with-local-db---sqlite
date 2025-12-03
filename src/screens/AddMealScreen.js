@@ -1,9 +1,12 @@
 import * as React from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Text, TextInput, Button, useTheme, Surface, HelperText, IconButton, Menu, Divider, Portal, Modal, ProgressBar, Chip } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useWeight } from '../context/WeightContext';
+import { useMeals } from '../context/MealContext';
+import * as CameraService from '../services/CameraService';
+import * as AIService from '../services/AIService';
 
 const categories = [
   { label: 'Завтрак', value: 'breakfast', icon: 'food-croissant' },
@@ -14,13 +17,28 @@ const categories = [
 
 export default function AddMealScreen() {
   const theme = useTheme();
+  const { addMeal } = useMeals();
+  
+  // Состояния для приема пищи
   const [description, setDescription] = React.useState('');
   const [category, setCategory] = React.useState(categories[0].value);
   const [portion, setPortion] = React.useState('');
+  const [calories, setCalories] = React.useState('');
+  const [protein, setProtein] = React.useState('');
+  const [fat, setFat] = React.useState('');
+  const [carbs, setCarbs] = React.useState('');
   const [date, setDate] = React.useState(new Date());
   const [showDate, setShowDate] = React.useState(false);
   const [menuVisible, setMenuVisible] = React.useState(false);
   const [error, setError] = React.useState('');
+  
+  // Состояния для фото и AI анализа
+  const [selectedImage, setSelectedImage] = React.useState(null);
+  const [analyzing, setAnalyzing] = React.useState(false);
+  const [analysisResult, setAnalysisResult] = React.useState(null);
+  const [showAnalysisModal, setShowAnalysisModal] = React.useState(false);
+  
+  // Состояния для модальных окон (старые, которые были удалены)
   const [weight, setWeight] = React.useState('');
   const [water, setWater] = React.useState('');
   const [weightModal, setWeightModal] = React.useState(false);
@@ -135,7 +153,75 @@ export default function AddMealScreen() {
     setWeightSettingsModal(false);
   };
 
-  const handleSave = () => {
+  // Функция для обработки фото с камеры
+  const handleTakePhoto = async () => {
+    try {
+      const photo = await CameraService.takePhoto();
+      if (photo) {
+        setSelectedImage(photo.uri);
+        await analyzePhoto(photo.uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+    }
+  };
+
+  // Функция для выбора фото из галереи
+  const handlePickImage = async () => {
+    try {
+      const photo = await CameraService.pickImageFromGallery();
+      if (photo) {
+        setSelectedImage(photo.uri);
+        await analyzePhoto(photo.uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+    }
+  };
+
+  // Функция для анализа фото с помощью AI
+  const analyzePhoto = async (imageUri) => {
+    try {
+      setAnalyzing(true);
+      setError('');
+      
+      // Анализируем фото с помощью AI
+      const result = await AIService.analyzeFoodImage(imageUri, description);
+      
+      if (result.success && result.data) {
+        setAnalysisResult(result.data);
+        
+        // Автоматически заполняем поля на основе результата
+        if (result.data.foods && result.data.foods.length > 0) {
+          const food = result.data.foods[0];
+          
+          // Обновляем название, если не было введено пользователем
+          if (!description.trim()) {
+            setDescription(food.name);
+          }
+          
+          // Заполняем КБЖУ
+          setPortion(food.weight_grams.toString());
+          setCalories(food.calories.toString());
+          setProtein(food.protein.toString());
+          setFat(food.fat.toString());
+          setCarbs(food.carbs.toString());
+        }
+        
+        // Показываем модальное окно с результатами
+        setShowAnalysisModal(true);
+      }
+    } catch (error) {
+      console.error('Error analyzing photo:', error);
+      setError('Не удалось проанализировать фото. Попробуйте еще раз.');
+    } finally {
+      setAnalyzing(false);
+      // Удаляем фото из памяти после анализа (как требуется в ТЗ)
+      setSelectedImage(null);
+    }
+  };
+
+  const handleSave = async () => {
     setError('');
     if (!description.trim()) {
       setError('Введите описание');
@@ -145,7 +231,38 @@ export default function AddMealScreen() {
       setError('Укажите размер порции (в граммах)');
       return;
     }
-    // TODO: логика сохранения приёма пищи
+
+    try {
+      const mealData = {
+        title: description.trim(),
+        description: description.trim(),
+        category,
+        portion_weight: parseInt(portion, 10),
+        calories: parseInt(calories || '0', 10),
+        protein: parseFloat(protein || '0'),
+        fat: parseFloat(fat || '0'),
+        carbs: parseFloat(carbs || '0'),
+        meal_time: date.toISOString(),
+      };
+
+      await addMeal(mealData);
+      
+      // Очищаем форму после успешного сохранения
+      setDescription('');
+      setPortion('');
+      setCalories('');
+      setProtein('');
+      setFat('');
+      setCarbs('');
+      setDate(new Date());
+      setAnalysisResult(null);
+      
+      // Показываем уведомление об успехе
+      alert('✅ Приём пищи успешно добавлен!');
+    } catch (error) {
+      console.error('Error saving meal:', error);
+      setError('Не удалось сохранить приём пищи');
+    }
   };
 
   return (
@@ -174,31 +291,40 @@ export default function AddMealScreen() {
                 <Chip
                   icon="camera"
                   mode="outlined"
-                  onPress={() => {}}
+                  onPress={handleTakePhoto}
                   style={styles.actionChip}
                   textStyle={styles.chipText}
+                  disabled={analyzing}
                 >
                   Фото
                 </Chip>
                 <Chip
                   icon="image"
                   mode="outlined"
-                  onPress={() => {}}
+                  onPress={handlePickImage}
                   style={styles.actionChip}
                   textStyle={styles.chipText}
+                  disabled={analyzing}
                 >
                   Галерея
                 </Chip>
                 <Chip
-                  icon="microphone"
+                  icon="robot"
                   mode="outlined"
-                  onPress={() => {}}
+                  onPress={() => analyzePhoto(null)}
                   style={styles.actionChip}
                   textStyle={styles.chipText}
+                  disabled={analyzing || !description.trim()}
                 >
-                  Голос
+                  Анализ
                 </Chip>
               </View>
+              {analyzing && (
+                <View style={styles.analyzingContainer}>
+                  <ActivityIndicator size="small" color="#6C63FF" />
+                  <Text style={styles.analyzingText}>Анализ фото...</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.inputSection}>
@@ -258,6 +384,63 @@ export default function AddMealScreen() {
                 mode="outlined"
               />
             </View>
+
+            {/* КБЖУ - автоматически заполняется после AI анализа */}
+            {(calories || protein || fat || carbs || analysisResult) && (
+              <View style={styles.nutritionSection}>
+                <Text style={styles.sectionLabel}>Пищевая ценность (КБЖУ)</Text>
+                <View style={styles.nutritionGrid}>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      label="Калории"
+                      value={calories}
+                      onChangeText={setCalories}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      placeholder="0"
+                      mode="outlined"
+                      dense
+                    />
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      label="Белки (г)"
+                      value={protein}
+                      onChangeText={setProtein}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      placeholder="0"
+                      mode="outlined"
+                      dense
+                    />
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      label="Жиры (г)"
+                      value={fat}
+                      onChangeText={setFat}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      placeholder="0"
+                      mode="outlined"
+                      dense
+                    />
+                  </View>
+                  <View style={styles.nutritionItem}>
+                    <TextInput
+                      label="Углеводы (г)"
+                      value={carbs}
+                      onChangeText={setCarbs}
+                      keyboardType="numeric"
+                      style={styles.nutritionInput}
+                      placeholder="0"
+                      mode="outlined"
+                      dense
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
 
             {error ? <HelperText type="error" visible style={styles.errorText}>{error}</HelperText> : null}
             
@@ -697,6 +880,95 @@ export default function AddMealScreen() {
           </Button>
         </Modal>
 
+        {/* Модальное окно с результатами AI анализа */}
+        <Modal 
+          visible={showAnalysisModal} 
+          onDismiss={() => setShowAnalysisModal(false)} 
+          contentContainerStyle={{ 
+            backgroundColor: '#fff', 
+            padding: 24, 
+            borderRadius: 18, 
+            marginHorizontal: 24,
+            maxHeight: '80%' 
+          }}
+        >
+          <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 16, color: '#6C63FF', textAlign: 'center' }}>
+            🤖 Результаты AI анализа
+          </Text>
+          {analysisResult && (
+            <ScrollView style={{ maxHeight: '80%' }}>
+              {analysisResult.foods && analysisResult.foods.map((food, index) => (
+                <View 
+                  key={index} 
+                  style={{ 
+                    backgroundColor: '#f8fafc',
+                    padding: 16,
+                    borderRadius: 12,
+                    marginBottom: 12
+                  }}
+                >
+                  <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#374151', marginBottom: 8 }}>
+                    {food.name}
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ color: '#6b7280' }}>Вес:</Text>
+                    <Text style={{ fontWeight: '600', color: '#374151' }}>{food.weight_grams} г</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ color: '#6b7280' }}>Калории:</Text>
+                    <Text style={{ fontWeight: '600', color: '#ef4444' }}>{food.calories} ккал</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ color: '#6b7280' }}>Белки:</Text>
+                    <Text style={{ fontWeight: '600', color: '#10b981' }}>{food.protein} г</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <Text style={{ color: '#6b7280' }}>Жиры:</Text>
+                    <Text style={{ fontWeight: '600', color: '#f59e0b' }}>{food.fat} г</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: '#6b7280' }}>Углеводы:</Text>
+                    <Text style={{ fontWeight: '600', color: '#3b82f6' }}>{food.carbs} г</Text>
+                  </View>
+                </View>
+              ))}
+              
+              {analysisResult.total && (
+                <View style={{ 
+                  backgroundColor: '#e0f2fe', 
+                  padding: 16, 
+                  borderRadius: 12, 
+                  marginTop: 8 
+                }}>
+                  <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#374151', marginBottom: 8 }}>
+                    Итого:
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: '#6b7280' }}>Калории:</Text>
+                    <Text style={{ fontWeight: 'bold', color: '#ef4444' }}>{analysisResult.total.calories} ккал</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: '#6b7280' }}>Б / Ж / У:</Text>
+                    <Text style={{ fontWeight: 'bold', color: '#374151' }}>
+                      {analysisResult.total.protein}г / {analysisResult.total.fat}г / {analysisResult.total.carbs}г
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              <Text style={{ fontSize: 12, color: '#6b7280', textAlign: 'center', marginTop: 16 }}>
+                💡 Подсказка: Вы можете отредактировать эти значения вручную
+              </Text>
+            </ScrollView>
+          )}
+          <Button 
+            mode="contained" 
+            onPress={() => setShowAnalysisModal(false)}
+            style={{ marginTop: 16, backgroundColor: '#6C63FF' }}
+          >
+            Понятно
+          </Button>
+        </Modal>
 
       </Portal>
     </View>
@@ -940,5 +1212,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
     fontWeight: '500',
+  },
+  analyzingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f0f4ff',
+    borderRadius: 12,
+  },
+  analyzingText: {
+    marginLeft: 8,
+    color: '#6C63FF',
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  nutritionSection: {
+    marginBottom: 20,
+  },
+  nutritionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  nutritionItem: {
+    width: '48%',
+    marginBottom: 12,
+  },
+  nutritionInput: {
+    backgroundColor: '#f8fafc',
+    borderColor: '#e2e8f0',
   },
 }); 

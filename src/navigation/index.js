@@ -43,13 +43,21 @@ function MainTabs() {
   );
 }
 
-export default function AppNavigator() {
+export default function AppNavigator({ isAuthenticated }) {
   return (
-    <Stack.Navigator initialRouteName="Welcome">
-      <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Login" component={AuthScreen} options={{ title: 'Вход / Регистрация', headerShown: false }} />
-      <Stack.Screen name="Register" component={AuthScreen} options={{ title: 'Вход / Регистрация', headerShown: false }} />
-      <Stack.Screen name="MainTabs" component={MainTabs} options={{ headerShown: false }} />
+    <Stack.Navigator 
+      screenOptions={{ headerShown: false }}
+    >
+      {!isAuthenticated ? (
+        // Пока пользователь не авторизован — только экран аутентификации
+        <Stack.Screen name="Auth" component={AuthScreen} />
+      ) : (
+        // После авторизации — основное приложение
+        <>
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen name="Welcome" component={WelcomeScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 } 

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import * as DatabaseService from '../services/DatabaseService';
 
 // Начальное состояние
 const initialState = {
@@ -107,59 +108,74 @@ export function WeightProvider({ children }) {
   // Функции для работы с данными
   const actions = {
     // Загрузка записей веса
+    // DONE 27.11.2025: Заменено на запрос к локальной SQLite БД через DatabaseService
     loadWeightRecords: async (period = 'month') => {
       dispatch({ type: WEIGHT_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
-        // Пока используем моковые данные
-        const mockRecords = generateMockWeightRecords(period);
-        dispatch({ type: WEIGHT_ACTIONS.SET_WEIGHT_RECORDS, payload: mockRecords });
-        calculateStats(mockRecords);
+        const records = await DatabaseService.loadWeightRecords(period);
+        dispatch({ type: WEIGHT_ACTIONS.SET_WEIGHT_RECORDS, payload: records });
+        calculateStats(records);
+        
+        // Устанавливаем текущий вес (последняя запись)
+        if (records.length > 0) {
+          const sortedRecords = [...records].sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
+          dispatch({ type: WEIGHT_ACTIONS.SET_CURRENT_WEIGHT, payload: sortedRecords[0].weight });
+        }
       } catch (error) {
+        console.error('Error loading weight records:', error);
         dispatch({ type: WEIGHT_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
 
     // Добавление записи веса
+    // DONE 27.11.2025: Заменено на сохранение в локальную SQLite БД через DatabaseService
     addWeightRecord: async (weightData) => {
       dispatch({ type: WEIGHT_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
-        const newRecord = {
-          id: Date.now().toString(),
-          weight: parseFloat(weightData.weight),
-          record_date: weightData.record_date || new Date().toISOString().split('T')[0],
-          created_at: new Date().toISOString(),
-        };
+        const newRecord = await DatabaseService.addWeightRecord(weightData);
         dispatch({ type: WEIGHT_ACTIONS.ADD_WEIGHT_RECORD, payload: newRecord });
+        dispatch({ type: WEIGHT_ACTIONS.SET_CURRENT_WEIGHT, payload: newRecord.weight });
         calculateStats([...state.weightRecords, newRecord]);
       } catch (error) {
+        console.error('Error adding weight record:', error);
         dispatch({ type: WEIGHT_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
 
     // Обновление записи веса
+    // DONE 27.11.2025: Заменено на обновление в локальной SQLite БД через DatabaseService
     updateWeightRecord: async (recordData) => {
       dispatch({ type: WEIGHT_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
-        dispatch({ type: WEIGHT_ACTIONS.UPDATE_WEIGHT_RECORD, payload: recordData });
+        const updatedRecord = await DatabaseService.updateWeightRecord(recordData);
+        dispatch({ type: WEIGHT_ACTIONS.UPDATE_WEIGHT_RECORD, payload: updatedRecord });
         calculateStats(state.weightRecords.map(record => 
-          record.id === recordData.id ? recordData : record
+          record.id === updatedRecord.id ? updatedRecord : record
         ));
       } catch (error) {
+        console.error('Error updating weight record:', error);
         dispatch({ type: WEIGHT_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
 
     // Удаление записи веса
+    // DONE 27.11.2025: Заменено на удаление из локальной SQLite БД через DatabaseService
     deleteWeightRecord: async (recordId) => {
       dispatch({ type: WEIGHT_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
+        await DatabaseService.deleteWeightRecord(recordId);
+        const filteredRecords = state.weightRecords.filter(record => record.id !== recordId);
         dispatch({ type: WEIGHT_ACTIONS.DELETE_WEIGHT_RECORD, payload: recordId });
-        calculateStats(state.weightRecords.filter(record => record.id !== recordId));
+        
+        // Обновляем текущий вес (последняя запись)
+        if (filteredRecords.length > 0) {
+          const sortedRecords = [...filteredRecords].sort((a, b) => new Date(b.record_date) - new Date(a.record_date));
+          dispatch({ type: WEIGHT_ACTIONS.SET_CURRENT_WEIGHT, payload: sortedRecords[0].weight });
+        }
+        
+        calculateStats(filteredRecords);
       } catch (error) {
+        console.error('Error deleting weight record:', error);
         dispatch({ type: WEIGHT_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
@@ -263,6 +279,8 @@ export function useWeight() {
 }
 
 // Вспомогательные функции для генерации моковых данных
+// DONE 27.11.2025: Функция оставлена для тестирования, но больше не используется в production
+// Данные теперь загружаются из локальной SQLite БД через DatabaseService
 function generateMockWeightRecords(period) {
   const records = [];
   const now = new Date();

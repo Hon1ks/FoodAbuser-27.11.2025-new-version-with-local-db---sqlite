@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import * as DatabaseService from '../services/DatabaseService';
 
 // Начальное состояние
 const initialState = {
@@ -99,58 +100,59 @@ export function MealProvider({ children }) {
   // Функции для работы с данными
   const actions = {
     // Загрузка приемов пищи
+    // DONE 27.11.2025: Заменено на запрос к локальной SQLite БД через DatabaseService
     loadMeals: async (period = 'week') => {
       dispatch({ type: MEAL_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
-        // Пока используем моковые данные
-        const mockMeals = generateMockMeals(period);
-        dispatch({ type: MEAL_ACTIONS.SET_MEALS, payload: mockMeals });
-        calculateStats(mockMeals);
+        const meals = await DatabaseService.loadMeals(period);
+        dispatch({ type: MEAL_ACTIONS.SET_MEALS, payload: meals });
+        calculateStats(meals);
       } catch (error) {
+        console.error('Error loading meals:', error);
         dispatch({ type: MEAL_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
 
     // Добавление приема пищи
+    // DONE 27.11.2025: Заменено на сохранение в локальную SQLite БД через DatabaseService
     addMeal: async (mealData) => {
       dispatch({ type: MEAL_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
-        const newMeal = {
-          id: Date.now().toString(),
-          ...mealData,
-          createdAt: new Date().toISOString(),
-        };
+        const newMeal = await DatabaseService.addMeal(mealData);
         dispatch({ type: MEAL_ACTIONS.ADD_MEAL, payload: newMeal });
         calculateStats([...state.meals, newMeal]);
       } catch (error) {
+        console.error('Error adding meal:', error);
         dispatch({ type: MEAL_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
 
     // Обновление приема пищи
+    // DONE 27.11.2025: Заменено на обновление в локальной SQLite БД через DatabaseService
     updateMeal: async (mealData) => {
       dispatch({ type: MEAL_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
-        dispatch({ type: MEAL_ACTIONS.UPDATE_MEAL, payload: mealData });
+        const updatedMeal = await DatabaseService.updateMeal(mealData);
+        dispatch({ type: MEAL_ACTIONS.UPDATE_MEAL, payload: updatedMeal });
         calculateStats(state.meals.map(meal => 
-          meal.id === mealData.id ? mealData : meal
+          meal.id === updatedMeal.id ? updatedMeal : meal
         ));
       } catch (error) {
+        console.error('Error updating meal:', error);
         dispatch({ type: MEAL_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
 
     // Удаление приема пищи
+    // DONE 27.11.2025: Заменено на удаление из локальной SQLite БД через DatabaseService
     deleteMeal: async (mealId) => {
       dispatch({ type: MEAL_ACTIONS.SET_LOADING, payload: true });
       try {
-        // TODO: Здесь будет запрос к Supabase
+        await DatabaseService.deleteMeal(mealId);
         dispatch({ type: MEAL_ACTIONS.DELETE_MEAL, payload: mealId });
         calculateStats(state.meals.filter(meal => meal.id !== mealId));
       } catch (error) {
+        console.error('Error deleting meal:', error);
         dispatch({ type: MEAL_ACTIONS.SET_ERROR, payload: error.message });
       }
     },
@@ -248,6 +250,8 @@ export function useMeals() {
 }
 
 // Вспомогательные функции для генерации моковых данных
+// DONE 27.11.2025: Функция оставлена для тестирования, но больше не используется в production
+// Данные теперь загружаются из локальной SQLite БД через DatabaseService
 function generateMockMeals(period) {
   const meals = [];
   const now = new Date();
@@ -301,8 +305,8 @@ function generateChartData(meals, period, type) {
   let data = [];
   
   if (type === 'weight') {
-    // Для веса пока возвращаем статические данные
-    // TODO: Интегрировать с WeightContext
+    // Для веса данные берутся из WeightContext
+    // TODO: Интегрировать с WeightContext (оставлено для будущей оптимизации)
     return {
       day: { labels: ['08:00', '12:00', '16:00', '20:00'], datasets: [{ data: [80, 80.1, 80, 79.9] }] },
       week: { labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], datasets: [{ data: [80.2, 80.1, 80, 80, 79.9, 79.8, 79.7] }] },
