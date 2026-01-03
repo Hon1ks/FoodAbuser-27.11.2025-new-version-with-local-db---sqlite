@@ -19,7 +19,7 @@ git remote add origin https://github.com/ТВОЙ_ЮЗЕРНЕЙМ/ИМЯ_РЕП
 git add .
 
 # Сделай первый коммит
-git commit -m "Первый коммит: добавлен рабочий прототип Dungeon Master Web"
+git commit -m "Первый коммит: добавлен рабочий прототип Приложения"
 
 # Назначь основную ветку main
 git branch -M main

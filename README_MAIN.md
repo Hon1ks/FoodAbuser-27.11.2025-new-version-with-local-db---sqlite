@@ -48,6 +48,18 @@ FoodAbuser — это мобильное приложение (React Native), к
 - Часть backend-функционала в разработке или замокана
 - Проект развивается поэтапно, с фокусом на проверку идей
 
+## 📸 Screenshots
+
+### Home / Daily summary
+![Home](./Screenshots/1.HomeScreen.jpg)
+### Add meal flow
+![Add meal](./Screenshots/2.AddMealScreen.jpg)
+### Diary & calendar
+![Diary](./Screenshots/3.DairyScreen.jpg)
+### Analytics
+![Analytics](./Screenshots/4.AnalyticsScreen.jpg)
+### Trackers
+![Trackers](./Screenshots/5.Trackers.jpg)
 
 
 ## Development Rules & Changelog Policy
