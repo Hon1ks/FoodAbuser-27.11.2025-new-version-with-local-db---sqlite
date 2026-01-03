@@ -461,7 +461,7 @@ export default function AddMealScreen() {
                   icon="history"
                   mode="outlined"
                   onPress={() => setShowHistoryModal(true)}
-                  style={styles.actionChip}
+                  style={styles.actionChip }
                   textStyle={styles.chipText}
                   disabled={analyzing || analysisHistory.length === 0}
                 >
@@ -1047,12 +1047,12 @@ export default function AddMealScreen() {
           <Text style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 8, color: '#6C63FF', textAlign: 'center' }}>
             🤖 AI Анализ еды
           </Text>
-          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 15,  }}>
+          <Text style={{ fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 12 }}>
             Найдено {editableItems?.length || 0} {editableItems?.length === 1 ? 'блюдо' : 'блюда'} 
           </Text>
           
           {analysisResult && (
-            <ScrollView style={{ maxHeight: '80%' }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: '80%', marginBottom: -40, bottom: -20 }} showsVerticalScrollIndicator={false}>
               {/* Карточки с продуктами (редактируемые) */}
               {editableItems && editableItems.map((item, index) => (
                 <View 
@@ -1269,7 +1269,7 @@ export default function AddMealScreen() {
               {/* Подсказка */}
               <View style={{ 
                 backgroundColor: '#fef3c7', 
-                padding: 12, 
+                padding: 15, 
                 borderRadius: 12, 
                 marginTop: 16,
                 flexDirection: 'row',
@@ -1289,7 +1289,7 @@ export default function AddMealScreen() {
               setShowAnalysisModal(false);
               setEditingItemIndex(null);
             }}
-            style={{ marginTop: 30, backgroundColor: '#6C63FF', borderRadius: 12 }}
+            style={{ marginTop: 30, backgroundColor: '#6C63FF', borderRadius: 12, top: 95 }}
             labelStyle={{ fontSize: 16, paddingVertical: 4 }}
           >
             Готово ✓
@@ -1471,6 +1471,7 @@ const styles = StyleSheet.create({
   },
   actionChip: {
     marginHorizontal: 4,
+    left: -23,
     backgroundColor: '#f8fafc',
     borderColor: '#e2e8f0',
   },

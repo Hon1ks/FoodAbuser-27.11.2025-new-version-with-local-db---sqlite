@@ -7,7 +7,7 @@
 
 ```bash
 # Перейди в папку с проектом
-cd D:/Projects/Dungeon_Master_Web
+cd D:/Projects/Food Abuser
 
 # Инициализируй git
 git init
