@@ -10,7 +10,7 @@ FoodAbuser — мобильное приложение для анализа п�
 - Фокус на privacy и минимальные серверные зависимости
 
 ## Tech Stack
-- React Native
+- React Native 
 - SQLite (local-first)
 - Cloudflare Workers
 - OpenRouter API (VLM)
